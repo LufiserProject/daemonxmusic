@@ -4,16 +4,14 @@ const path = require('path');
 
 const dir = path.resolve(__dirname, '..');
 
-async function initAndCommit() {
-    console.log('📦 Inicializando repositorio Git local con isomorphic-git...');
-    await git.init({ fs, dir });
+async function stageAndCommit() {
+    console.log('📦 Escaneando todos los archivos (incluyendo .github)...');
 
-    // Encontrar todos los archivos a añadir ignorando los de .gitignore
     const gitignoreContent = fs.readFileSync(path.join(dir, '.gitignore'), 'utf8');
     const ignoreList = gitignoreContent.split('\n').map(s => s.trim()).filter(Boolean);
 
     function shouldIgnore(relPath) {
-        if (relPath.startsWith('.git')) return true;
+        if (relPath === '.git' || relPath.startsWith('.git/') || relPath.startsWith('.git\\')) return true;
         for (const pattern of ignoreList) {
             const cleanPattern = pattern.replace(/\/$/, '');
             if (relPath === cleanPattern || relPath.startsWith(cleanPattern + '/') || relPath.startsWith(cleanPattern + '\\')) return true;
@@ -40,7 +38,8 @@ async function initAndCommit() {
     }
 
     const files = getAllFiles(dir);
-    console.log(`📄 Añadiendo ${files.length} archivos al área de preparación (stage)...`);
+    console.log(`📄 Añadiendo ${files.length} archivos a Git...`);
+    console.log('¿Incluye workflows?', files.filter(f => f.includes('workflows')));
 
     for (const filepath of files) {
         await git.add({ fs, dir, filepath });
@@ -49,14 +48,14 @@ async function initAndCommit() {
     const sha = await git.commit({
         fs,
         dir,
-        message: 'Initial commit: iOS native project setup with Capacitor and GitHub Actions workflow',
+        message: 'Add iOS build workflow and native project configuration',
         author: {
             name: 'DaemonX Team',
             email: 'daemonx@music.local'
         }
     });
 
-    console.log(`✅ Commit inicial completado con éxito: ${sha}`);
+    console.log(`✅ Commit completado: ${sha}`);
 }
 
-initAndCommit().catch(console.error);
+stageAndCommit().catch(console.error);

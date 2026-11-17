@@ -1,0 +1,9 @@
+node_modules/
+*.ipa
+deploy-*.zip
+.DS_Store
+Thumbs.db
+Payload/
+build/
+DerivedData/
+*.log
