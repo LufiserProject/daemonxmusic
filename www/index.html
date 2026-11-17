@@ -1,0 +1,2215 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <!-- Blindaje y Optimizaciones Nativas para iOS / iPhone / iPad -->
+  <script>
+    (function () {
+      // 1. Blindaje de Page Visibility API contra pausas involuntarias en segundo plano y pantalla apagada
+      try {
+        Object.defineProperty(document, 'hidden', { get: function () { return false; }, configurable: true });
+        Object.defineProperty(document, 'visibilityState', { get: function () { return 'visible'; }, configurable: true });
+        Object.defineProperty(Document.prototype, 'hidden', { get: function () { return false; }, configurable: true });
+        Object.defineProperty(Document.prototype, 'visibilityState', { get: function () { return 'visible'; }, configurable: true });
+        window.addEventListener('visibilitychange', function (e) { e.stopImmediatePropagation(); }, true);
+        document.addEventListener('visibilitychange', function (e) { e.stopImmediatePropagation(); }, true);
+      } catch (e) { }
+
+      // 2. Motor de Audio en Segundo Plano para iOS (AVAudioSession Keep-Alive)
+      var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+      if (isIOS) {
+        document.documentElement.classList.add('is-ios-device');
+
+        // Audio silencioso en bucle para mantener el canal de audio del sistema despierto en segundo plano
+        var silentCarrier = document.createElement('audio');
+        silentCarrier.setAttribute('playsinline', '');
+        silentCarrier.setAttribute('webkit-playsinline', '');
+        silentCarrier.setAttribute('preload', 'auto');
+        silentCarrier.loop = true;
+        silentCarrier.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+        silentCarrier.volume = 0.001;
+
+        var audioUnlocked = false;
+        function unlockIOSAudio() {
+          if (audioUnlocked) return;
+          silentCarrier.play().then(function() {
+            audioUnlocked = true;
+            console.log('⚡ [iOS DaemonX] Audio en segundo plano activado y asegurado');
+          }).catch(function() {});
+        }
+
+        window.addEventListener('touchstart', unlockIOSAudio, { passive: true, once: true });
+        window.addEventListener('touchend', unlockIOSAudio, { passive: true, once: true });
+        window.addEventListener('click', unlockIOSAudio, { passive: true, once: true });
+      }
+    })();
+  </script>
+  <meta charset="UTF-8" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>DaemonX Music — Tu Streaming Privado</title>
+  <meta name="description"
+    content="DaemonX Music: Reproductor de streaming privado con búsqueda de YouTube, playlists personalizadas en Supabase y audio de alta fidelidad." />
+  
+  <!-- Iconos e Identidad Nativa iOS (Apple Touch Icons de Alta Definición) -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  <link rel="apple-touch-icon" sizes="167x167" href="/apple-touch-icon-167x167.png" />
+  <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon-152x152.png" />
+  <link rel="apple-touch-icon" sizes="120x120" href="/apple-touch-icon-120x120.png" />
+  <link rel="apple-touch-startup-image" href="/logo.png" />
+  <link rel="manifest" href="/manifest.json" />
+
+  <!-- Metadatos de Sistema iOS / WKWebView -->
+  <meta name="theme-color" content="#070913" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="DaemonX" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-touch-fullscreen" content="yes" />
+  <meta name="format-detection" content="telephone=no" />
+
+  <!-- Estilos de Ajuste para Dynamic Island, Notches y Safe Areas de iOS -->
+  <style id="ios-native-optimizations">
+    :root {
+      --sat: env(safe-area-inset-top, 0px);
+      --sab: env(safe-area-inset-bottom, 0px);
+      --sal: env(safe-area-inset-left, 0px);
+      --sar: env(safe-area-inset-right, 0px);
+    }
+    html, body {
+      overscroll-behavior-y: none;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+    }
+    @supports (-webkit-touch-callout: none) {
+      .top-header {
+        padding-top: var(--sat) !important;
+        height: calc(var(--header-height) + var(--sat)) !important;
+      }
+      .app-container {
+        grid-template-rows: calc(var(--header-height) + var(--sat)) 1fr var(--player-height) !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+      }
+      .sidebar {
+        padding-top: max(14px, var(--sat)) !important;
+        padding-left: max(14px, var(--sal)) !important;
+      }
+      .mobile-bottom-nav {
+        padding-bottom: max(6px, var(--sab)) !important;
+        height: calc(var(--mobile-bottom-nav) + var(--sab)) !important;
+      }
+      .mobile-player-sheet {
+        padding-top: max(18px, var(--sat)) !important;
+        padding-bottom: max(24px, var(--sab)) !important;
+      }
+      .lyrics-view-overlay, .queue-drawer {
+        padding-top: max(16px, var(--sat)) !important;
+        padding-bottom: max(20px, var(--sab)) !important;
+      }
+    }
+  </style>
+
+  <!-- Tipografías de alta calidad -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet">
+
+  <script type="module" crossorigin src="/assets/index-Bw_8863M.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-Cc-7HFPr.css">
+</head>
+
+<body>
+  <!-- AUTH GATE: Pantalla de login obligatoria para entrar a la app -->
+  <div id="auth-gate" class="auth-gate">
+    <div class="auth-gate-bg"></div>
+    <div class="auth-gate-card">
+      <div class="auth-gate-brand">
+        <img src="./logo.png" alt="DaemonX Logo" class="auth-gate-logo" />
+        <div class="auth-gate-brand-text">
+          <span class="auth-gate-brand-name">Daemon<span class="brand-accent">X</span></span>
+          <span class="auth-gate-brand-tag">MUSIC PLAYER</span>
+        </div>
+      </div>
+      <h2 id="gate-title" class="auth-gate-title">Acceso Privado</h2>
+      <p id="gate-subtitle" class="auth-gate-subtitle">Esta aplicación es de uso privado. Inicia sesión con las
+        credenciales asignadas por el administrador.</p>
+      <form id="gate-form" class="auth-gate-form">
+        <div class="form-group">
+          <label id="gate-user-label" for="gate-email">Usuario o Correo Electrónico</label>
+          <input type="text" id="gate-email" placeholder="p. ej. Lucifer o usuario@correo.com" autocomplete="username"
+            required />
+        </div>
+        <div class="form-group">
+          <label for="gate-password">Contraseña</label>
+          <input type="password" id="gate-password" placeholder="••••••••" autocomplete="current-password" required />
+        </div>
+        <div id="gate-forgot-container"
+          style="display: flex; justify-content: flex-end; margin-top: -6px; margin-bottom: 2px;">
+          <button type="button" id="gate-btn-forgot" class="btn-forgot-password">¿Has olvidado tu contraseña?</button>
+        </div>
+        <div id="gate-feedback" class="gate-feedback hidden"></div>
+        <button type="submit" id="gate-btn-signin" class="btn-primary gate-submit-btn">Iniciar Sesión</button>
+      </form>
+      <p class="auth-gate-note">🔒 Aplicación privada. Si no tienes acceso o tus credenciales fallan, contacta al
+        administrador del sistema.</p>
+    </div>
+  </div>
+
+  <div id="app" class="app-container" style="display: none;">
+    <!-- BARRA LATERAL (SIDEBAR) -->
+    <aside id="sidebar" class="sidebar">
+      <div class="brand-container">
+        <img src="./logo.png" alt="DaemonX Logo" class="brand-logo" />
+        <div class="brand-text">
+          <span class="brand-name">Daemon<span class="brand-accent">X</span></span>
+          <span class="brand-tag">MUSIC PLAYER</span>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <span class="nav-section-label">Menú Principal</span>
+        <button class="nav-item active" data-view="home" id="nav-home">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" />
+          </svg>
+          <span>Inicio</span>
+        </button>
+
+        <button class="nav-item" data-view="search" id="nav-search">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <span>Buscar</span>
+        </button>
+
+        <button class="nav-item" data-view="library" id="nav-library">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
+            <path d="M6 6h10" />
+            <path d="M6 10h10" />
+          </svg>
+          <span>Tu Biblioteca</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-divider"></div>
+
+      <div class="library-shortcuts">
+        <span class="nav-section-label">Tu Colección</span>
+        <button class="nav-item" data-view="favorites" id="nav-favorites">
+          <div class="nav-icon-badge favorites-badge">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+            </svg>
+          </div>
+          <span>Tus Me Gusta</span>
+        </button>
+
+        <button class="nav-item" data-view="history" id="nav-history">
+          <div class="nav-icon-badge history-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+          </div>
+          <span>Historial</span>
+        </button>
+      </div>
+
+      <div class="sidebar-playlists-section">
+        <div class="playlists-header">
+          <span class="playlists-title">PLAYLISTS</span>
+          <div class="playlists-header-actions" style="display: flex; gap: 4px; align-items: center;">
+            <button id="btn-sidebar-import-playlist" class="btn-icon-small" title="Importar playlist">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+            </button>
+            <button id="btn-create-playlist" class="btn-icon-small" title="Crear nueva playlist">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div id="sidebar-playlists-list" class="sidebar-playlists-list custom-scroll">
+          <!-- Playlists cargadas dinámicamente -->
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <div id="btn-supabase-status" class="supabase-status-pill disconnected" title="Estado de conexión Supabase">
+          <span class="status-dot"></span>
+          <span class="status-label">Supabase Desconectado</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- HEADER SUPERIOR — fuera del área scrollable, fila propia en el grid -->
+    <header class="top-header">
+      <!-- Botón hamburguesa solo visible en mobile -->
+      <button id="btn-mobile-menu" class="btn-mobile-menu" title="Menú" aria-label="Abrir menú">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="6" x2="21" y2="6" />
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+      </button>
+      <div class="header-left">
+        <div class="history-nav">
+          <button id="btn-history-back" class="nav-arrow-btn" title="Atrás" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+          <button id="btn-history-forward" class="nav-arrow-btn" title="Adelante" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="search-bar-container">
+          <svg class="search-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input type="text" id="global-search-input"
+            placeholder="¿Qué quieres escuchar hoy? (Canciones, artistas, géneros...)" autocomplete="off" />
+          <button id="btn-clear-search" class="btn-clear-search hidden" title="Borrar búsqueda">✕</button>
+          <div id="search-spinner" class="search-spinner hidden"></div>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <button id="btn-auth-user" class="user-profile-btn" title="Configuración de la Cuenta">
+          <div class="avatar-circle" id="header-avatar-container">
+            <img id="header-avatar-img" class="header-avatar-img hidden" alt="Avatar" />
+            <svg id="header-avatar-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </div>
+          <span id="user-display-name">Usuario</span>
+        </button>
+        <button id="btn-header-signout" class="btn-signout" title="Cerrar sesión" style="display:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+          <span>Salir</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- OVERLAY SIDEBAR (mobile) -->
+    <div id="sidebar-overlay" class="sidebar-overlay"></div>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <main id="main-content" class="main-content custom-scroll">
+      <!-- VISTAS DINÁMICAS -->
+      <div id="views-container" class="views-container">
+        <!-- VISTA: INICIO -->
+        <section id="view-home" class="view-panel active">
+          <div class="hero-banner">
+            <div class="hero-backdrop"></div>
+            <div class="hero-mesh-grid"></div>
+            <div class="hero-body">
+              <div class="hero-content">
+                <div class="hero-badge-wrap">
+                  <div class="hero-badge">
+                    <span class="hero-badge-dot"></span>
+                    <span class="hero-badge-text">DAEMONX AUDIO SYSTEM</span>
+                    <span class="hero-badge-tag">HI-RES AUDIO</span>
+                  </div>
+                  <div class="hero-live-indicator">
+                    <span class="hero-live-pulse"></span>
+                    <span>ONLINE</span>
+                  </div>
+                </div>
+                <h1 class="hero-title">Tu música, tus reglas, <span class="hero-title-accent">sin límites</span></h1>
+                <p class="hero-desc">Busca cualquier tema en YouTube, crea tus playlists sincronizadas con Supabase y
+                  disfruta de una experiencia auditiva pura y de alta fidelidad.</p>
+                <div class="hero-telemetry-row">
+                  <div class="telemetry-pill">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                    </svg>
+                    <span>Direct Streaming</span>
+                  </div>
+                  <div class="telemetry-pill">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="2" y1="12" x2="22" y2="12" />
+                      <path
+                        d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                    </svg>
+                    <span>320 kbps Ultra</span>
+                  </div>
+                  <div class="telemetry-pill">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
+                    </svg>
+                    <span>Cloud Sync</span>
+                  </div>
+                </div>
+                <div class="hero-actions">
+                  <button id="btn-hero-explore" class="btn-primary">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <polygon points="5 3 19 12 5 21 5 3" />
+                    </svg>
+                    <span>Explorar Temas Top</span>
+                  </button>
+                  <button id="btn-hero-create" class="btn-secondary">
+                    <span>+ Nueva Playlist</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Ecualizador y Espectro Cyberpunk -->
+              <div class="hero-visualizer-card" aria-hidden="true">
+                <div class="hero-visualizer-glow"></div>
+                <div class="hero-visualizer-header">
+                  <div class="vis-header-left">
+                    <span class="vis-status-led"></span>
+                    <span class="vis-header-title">SPECTRUM CORE</span>
+                  </div>
+                  <span class="vis-channel">48kHz · 24-BIT</span>
+                </div>
+                <div class="hero-visualizer-bars">
+                  <div class="vis-bar bar-1"></div>
+                  <div class="vis-bar bar-2"></div>
+                  <div class="vis-bar bar-3"></div>
+                  <div class="vis-bar bar-4"></div>
+                  <div class="vis-bar bar-5"></div>
+                  <div class="vis-bar bar-6"></div>
+                  <div class="vis-bar bar-7"></div>
+                  <div class="vis-bar bar-8"></div>
+                  <div class="vis-bar bar-9"></div>
+                  <div class="vis-bar bar-10"></div>
+                  <div class="vis-bar bar-11"></div>
+                  <div class="vis-bar bar-12"></div>
+                  <div class="vis-bar bar-13"></div>
+                  <div class="vis-bar bar-14"></div>
+                  <div class="vis-bar bar-15"></div>
+                  <div class="vis-bar bar-16"></div>
+                </div>
+                <div class="hero-visualizer-footer">
+                  <div class="vis-stat-item">
+                    <span class="vis-stat-label">LATENCIA</span>
+                    <span class="vis-stat-val">12 ms</span>
+                  </div>
+                  <div class="vis-stat-item">
+                    <span class="vis-stat-label">BUFFER</span>
+                    <span class="vis-stat-val">OPTIMAL</span>
+                  </div>
+                  <div class="vis-stat-item">
+                    <span class="vis-stat-label">MOTOR</span>
+                    <span class="vis-stat-val active">ONLINE</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-block">
+            <div class="section-header">
+              <h2 class="section-title">Accesos Rápidos</h2>
+            </div>
+            <div id="home-quick-cards" class="quick-cards-grid">
+              <!-- Renderizado dinámicamente -->
+            </div>
+          </div>
+
+          <div class="section-block" id="section-home-featured">
+            <div class="section-header">
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <h2 class="section-title" id="home-featured-title">Recomendados DaemonX</h2>
+                <span id="badge-personalized" class="badge-personalized hidden">Para ti ⚡</span>
+              </div>
+              <span class="section-subtitle" id="home-featured-subtitle">Pistas destacadas listas para escuchar</span>
+            </div>
+            <div id="home-featured-grid" class="cards-grid">
+              <!-- Renderizado dinámicamente -->
+            </div>
+          </div>
+
+          <!-- SECCIÓN: TUS ARTISTAS FRECUENTES (HOME PC DESKTOP EXPANSIVO) -->
+          <div class="section-block" id="section-home-artists">
+            <div class="section-header">
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <h2 class="section-title" id="home-artists-title">Tus Artistas Frecuentes</h2>
+                <span class="badge-personalized" id="home-artists-badge">Top Artistas ⚡</span>
+              </div>
+              <span class="section-subtitle" id="home-artists-subtitle">Los artistas que dominan tu biblioteca y
+                recomendaciones afines</span>
+            </div>
+            <div id="home-artists-container" class="artists-showcase-layout">
+              <!-- Renderizado dinámicamente -->
+            </div>
+          </div>
+
+          <div class="section-block">
+            <div class="section-header">
+              <h2 class="section-title">Tus Playlists</h2>
+            </div>
+            <div id="home-playlists-grid" class="cards-grid">
+              <!-- Renderizado dinámicamente -->
+            </div>
+          </div>
+        </section>
+
+        <!-- VISTA: BÚSQUEDA -->
+        <section id="view-search" class="view-panel">
+          <div class="search-view-header">
+            <div>
+              <h2 id="search-title-heading" class="section-title">Explorar Música</h2>
+              <div id="search-stats" class="search-stats">Escribe una canción o artista en la barra superior</div>
+            </div>
+            <!-- Filtros estilo Spotify (Pills) -->
+            <div id="search-filter-pills" class="search-filter-pills hidden">
+              <button class="search-pill active" data-filter="all">Todo</button>
+              <button class="search-pill" data-filter="tracks">Canciones</button>
+              <button class="search-pill" data-filter="artists">Artistas</button>
+            </div>
+          </div>
+
+          <!-- Contenedor inicial cuando no hay búsqueda (Explorar) -->
+          <div id="search-explore-wrapper" class="search-explore-wrapper">
+            <div class="section-block" id="section-search-artists-explore">
+              <div class="section-header">
+                <div>
+                  <h3 class="subsection-title" id="search-artists-explore-title" style="margin: 0;">Artistas Destacados
+                  </h3>
+                  <span class="section-subtitle" id="search-artists-explore-sub">Explora los artistas más populares y
+                    escuchados</span>
+                </div>
+              </div>
+              <div id="search-featured-artists" class="artists-showcase-layout">
+                <!-- Artistas generados dinámicamente -->
+              </div>
+            </div>
+
+            <div class="section-block" style="margin-top: 36px;">
+              <div class="section-header">
+                <h3 class="subsection-title" style="margin: 0;">Explorar por Géneros</h3>
+              </div>
+              <div id="search-genres" class="genres-grid">
+                <!-- Géneros rápidos -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Resultados de búsqueda -->
+          <div id="search-results-wrapper" class="search-results-wrapper hidden">
+            <!-- Sección de Artistas encontrados (en filtro 'all' o 'artists') -->
+            <div id="search-artists-section" class="search-artists-section hidden">
+              <div class="section-header" style="margin-bottom: 14px;">
+                <h3 class="subsection-title" style="margin: 0;">Artistas Encontrados</h3>
+              </div>
+              <div id="search-artists-grid" class="artists-showcase-grid">
+                <!-- Artistas encontrados en la búsqueda -->
+              </div>
+            </div>
+
+            <div class="results-layout" id="search-results-layout">
+              <div id="search-top-result" class="top-result-card">
+                <!-- Mejor resultado -->
+              </div>
+              <div class="search-tracks-list-wrapper">
+                <h3 class="subsection-title" id="search-tracks-heading">Canciones</h3>
+                <div id="search-tracks-list" class="tracks-list">
+                  <!-- Lista de canciones encontradas -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VISTA: BIBLIOTECA -->
+        <section id="view-library" class="view-panel">
+          <!-- Cabecera: título + subtítulo -->
+          <div class="library-page-header">
+            <div>
+              <h2 class="section-title">Tu Biblioteca</h2>
+              <p class="section-subtitle">Tus colecciones y listas privadas de música</p>
+            </div>
+          </div>
+
+          <!-- Barra de herramientas de la biblioteca -->
+          <div class="library-toolbar">
+            <span class="library-playlist-count" id="library-playlist-count">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 18V5l12-2v13" />
+                <circle cx="6" cy="18" r="3" />
+                <circle cx="18" cy="16" r="3" />
+              </svg>
+              <span id="library-count-text">0 playlists</span>
+            </span>
+            <div class="library-toolbar-actions">
+              <button id="btn-library-import" class="library-action-btn library-action-import"
+                title="Importar playlist desde archivo o código">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                <span>Importar</span>
+              </button>
+              <button id="btn-library-create" class="library-action-btn library-action-create">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                <span>Nueva Playlist</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="library-playlists-grid" class="cards-grid">
+            <!-- Playlists en tarjetas grandes -->
+          </div>
+        </section>
+
+        <!-- VISTA: DETALLE DE PLAYLIST -->
+        <section id="view-playlist" class="view-panel">
+          <div id="playlist-header-hero" class="playlist-hero">
+            <div class="playlist-cover-large" id="playlist-cover-large">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M9 18V5l12-2v13" />
+                <circle cx="6" cy="18" r="3" />
+                <circle cx="18" cy="16" r="3" />
+              </svg>
+            </div>
+            <div class="playlist-hero-details">
+              <span class="playlist-type-badge">PLAYLIST PRIVADA</span>
+              <h1 id="playlist-detail-name" class="playlist-detail-title">Nombre de la Playlist</h1>
+              <p id="playlist-detail-desc" class="playlist-detail-description">Sin descripción</p>
+              <div class="playlist-meta-row">
+                <span id="playlist-detail-owner" class="playlist-meta-owner">DaemonX</span>
+                <span class="meta-dot">•</span>
+                <span id="playlist-detail-count">0 canciones</span>
+                <div class="playlist-meta-quick-actions">
+                  <button id="btn-playlist-export" class="btn-meta-mini" title="Exportar / Compartir playlist">
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                      <polyline points="16 6 12 2 8 6" />
+                      <line x1="12" y1="2" x2="12" y2="15" />
+                    </svg>
+                    <span>Compartir</span>
+                  </button>
+                  <button id="btn-playlist-edit" class="btn-meta-mini" title="Editar detalles de la playlist">
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                    </svg>
+                    <span>Editar</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="playlist-actions-bar">
+            <button id="btn-playlist-play-all" class="btn-circle-play" title="Reproducir playlist">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+            </button>
+            <button id="btn-playlist-shuffle" class="btn-icon-action" title="Aleatorio">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="16 3 21 3 21 8" />
+                <line x1="4" y1="20" x2="21" y2="3" />
+                <polyline points="21 16 21 21 16 21" />
+                <line x1="15" y1="15" x2="21" y2="21" />
+                <line x1="4" y1="4" x2="9" y2="9" />
+              </svg>
+            </button>
+            <button id="btn-playlist-queue-all" class="btn-icon-action" title="Añadir todas las canciones a la cola">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="3" y1="6" x2="15" y2="6" />
+                <line x1="3" y1="12" x2="15" y2="12" />
+                <line x1="3" y1="18" x2="11" y2="18" />
+                <line x1="18" y1="15" x2="18" y2="21" />
+                <line x1="15" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
+            <button id="btn-playlist-add-song" class="btn-add-music-action" title="Añadir música a este álbum">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              <span>Añadir música</span>
+            </button>
+            <button id="btn-playlist-customize" class="btn-playlist-customize"
+              title="Personalizar color y carátula de la playlist">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" />
+                <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" />
+                <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" />
+                <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" />
+                <path
+                  d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
+              </svg>
+              <span>Color y Carátula</span>
+            </button>
+            <button id="btn-playlist-delete" class="btn-icon-action text-danger btn-playlist-delete-end"
+              title="Eliminar playlist">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+            </button>
+          </div>
+
+          <div class="playlist-table-container">
+            <div class="table-header">
+              <div class="col-index">#</div>
+              <div class="col-title">TÍTULO</div>
+              <div class="col-artist">CANAL / ARTISTA</div>
+              <div class="col-duration">DURACIÓN</div>
+              <div class="col-actions"></div>
+            </div>
+            <div id="playlist-songs-list" class="tracks-list">
+              <!-- Canciones de la playlist -->
+            </div>
+          </div>
+        </section>
+
+        <!-- VISTA: FAVORITOS -->
+        <section id="view-favorites" class="view-panel">
+          <div class="playlist-hero favorites-hero">
+            <div class="playlist-cover-large favorites-cover">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path
+                  d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+              </svg>
+            </div>
+            <div class="playlist-hero-details">
+              <span class="playlist-type-badge">COLECCIÓN</span>
+              <h1 class="playlist-detail-title">Canciones que te gustan</h1>
+              <p class="playlist-detail-description">Todas tus canciones favoritas marcadas en DaemonX Music</p>
+              <div class="playlist-meta-row">
+                <span id="favorites-count-label">0 canciones</span>
+              </div>
+            </div>
+          </div>
+          <div class="playlist-table-container">
+            <div id="favorites-songs-list" class="tracks-list">
+              <!-- Canciones favoritas -->
+            </div>
+          </div>
+        </section>
+
+        <!-- VISTA: HISTORIAL -->
+        <section id="view-history" class="view-panel">
+          <div class="section-header space-between">
+            <div>
+              <h2 class="section-title">Historial de Reproducción</h2>
+              <p class="section-subtitle">Las últimas canciones que has disfrutado</p>
+            </div>
+            <button id="btn-clear-history" class="btn-secondary">
+              <span>Limpiar Historial</span>
+            </button>
+          </div>
+          <div id="history-songs-list" class="tracks-list">
+            <!-- Historial -->
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- PANEL DERECHO DE COLA / VISUALIZADOR (DESPLEGABLE) -->
+    <aside id="queue-drawer" class="queue-drawer">
+      <div class="drawer-header">
+        <div class="drawer-header-left">
+          <h3 class="drawer-title">Cola de Reproducción</h3>
+          <span id="queue-badge-count" class="queue-badge-count hidden">0</span>
+        </div>
+        <div class="drawer-header-actions">
+          <button id="btn-clear-queue" class="btn-clear-queue-action"
+            title="Vaciar cola de reproducción">Limpiar</button>
+          <button id="btn-close-queue" class="btn-icon-small" title="Cerrar panel">✕</button>
+        </div>
+      </div>
+      <div class="drawer-section drawer-section-current">
+        <span class="drawer-section-title">EN REPRODUCCIÓN</span>
+        <div id="queue-current-track" class="queue-current-card">
+          <!-- Canción actual en cola -->
+        </div>
+      </div>
+      <div class="drawer-section drawer-section-upcoming">
+        <div class="drawer-upcoming-header">
+          <span class="drawer-section-title" style="margin-bottom: 0;">SIGUIENTE EN COLA</span>
+          <span class="drawer-reorder-hint">Arrastra o usa ▲▼</span>
+        </div>
+        <div id="queue-list" class="queue-list custom-scroll">
+          <!-- Siguientes canciones -->
+        </div>
+      </div>
+    </aside>
+    <!-- OVERLAY COLA (mobile) -->
+    <div id="queue-overlay" class="queue-overlay"></div>
+
+    <!-- REPRODUCTOR INFERIOR PERSISTENTE (PLAYER BAR) -->
+    <footer id="player-bar" class="player-bar">
+      <!-- Barra de progreso mini para reproductor flotante mobile -->
+      <div class="player-mini-progress">
+        <div id="player-mini-progress-fill" class="player-mini-progress-fill"></div>
+      </div>
+      <!-- Izquierda: Portada y metadatos de canción -->
+      <div class="player-left">
+        <div class="player-thumb-wrapper">
+          <img id="player-thumb" src="/daemonx-logo.svg" alt="Cover" class="player-thumb" />
+          <div id="player-engine-badge" class="engine-badge" title="Motor de reproducción: Iframe/Directo">DX</div>
+        </div>
+        <div class="player-track-info">
+          <div id="player-track-title" class="player-track-title">DaemonX Music</div>
+          <div id="player-track-artist" class="player-track-artist">Listo para reproducir</div>
+        </div>
+        <button id="btn-player-like" class="btn-player-like" title="Añadir a favoritos">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path
+              d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+          </svg>
+        </button>
+        <button id="btn-player-add-playlist" class="btn-player-action" title="Añadir a playlist">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Centro: Controles de reproducción y barra de progreso -->
+      <div class="player-center">
+        <div class="player-controls">
+          <button id="btn-player-shuffle" class="control-btn" title="Aleatorio">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="16 3 21 3 21 8" />
+              <line x1="4" y1="20" x2="21" y2="3" />
+              <polyline points="21 16 21 21 16 21" />
+              <line x1="15" y1="15" x2="21" y2="21" />
+              <line x1="4" y1="4" x2="9" y2="9" />
+            </svg>
+          </button>
+
+          <button id="btn-player-prev" class="control-btn" title="Anterior">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="19 20 9 12 19 4 19 20" />
+              <line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2" />
+            </svg>
+          </button>
+
+          <button id="btn-player-play-pause" class="control-btn-play" title="Reproducir / Pausar">
+            <svg id="icon-play" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="6 4 20 12 6 20 6 4" />
+            </svg>
+            <svg id="icon-pause" class="hidden" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="4" width="4" height="16" />
+              <rect x="14" y="4" width="4" height="16" />
+            </svg>
+          </button>
+
+          <button id="btn-player-next" class="control-btn" title="Siguiente">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 4 15 12 5 20 5 4" />
+              <line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2" />
+            </svg>
+          </button>
+
+          <button id="btn-player-repeat" class="control-btn" title="Repetir">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="17 1 21 5 17 9" />
+              <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+              <polyline points="7 23 3 19 7 15" />
+              <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="player-progress-bar-container">
+          <span id="player-time-current" class="time-label">0:00</span>
+          <div id="player-seekbar" class="seekbar">
+            <div id="player-seek-buffer" class="seek-buffer"></div>
+            <div id="player-seek-fill" class="seek-fill"></div>
+            <div id="player-seek-thumb" class="seek-thumb"></div>
+          </div>
+          <span id="player-time-total" class="time-label">0:00</span>
+        </div>
+      </div>
+
+      <!-- Derecha: Visualizador, Volumen, Cola, Mini-video/Pantalla completa -->
+      <!-- MOBILE: Controles prev/play/next directamente en player-right -->
+      <div class="player-mobile-controls">
+        <button id="btn-player-prev-m" class="control-btn" title="Anterior">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px">
+            <polygon points="19 20 9 12 19 4 19 20" />
+            <line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2" />
+          </svg>
+        </button>
+        <button id="btn-player-play-pause-m" class="control-btn-play" title="Reproducir / Pausar">
+          <svg id="icon-play-m" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="6 4 20 12 6 20 6 4" />
+          </svg>
+          <svg id="icon-pause-m" class="hidden" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="6" y="4" width="4" height="16" />
+            <rect x="14" y="4" width="4" height="16" />
+          </svg>
+        </button>
+        <button id="btn-player-next-m" class="control-btn" title="Siguiente">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px">
+            <polygon points="5 4 15 12 5 20 5 4" />
+            <line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2" />
+          </svg>
+        </button>
+      </div>
+      <div class="player-right">
+        <!-- Canvas Visualizador en tiempo real -->
+        <div class="visualizer-wrapper" title="Visualizador de frecuencias de audio">
+          <canvas id="audio-visualizer" width="80" height="26"></canvas>
+        </div>
+
+        <button id="btn-player-lyrics" class="control-btn-subtle" title="Ver Letras (L)" aria-label="Ver Letras">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+            <line x1="12" y1="19" x2="12" y2="22"></line>
+            <line x1="8" y1="22" x2="16" y2="22"></line>
+          </svg>
+        </button>
+
+        <button id="btn-toggle-queue" class="control-btn-subtle" title="Cola de reproducción"
+          aria-label="Cola de reproducción">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="12" x2="15" y2="12"></line>
+            <line x1="3" y1="18" x2="18" y2="18"></line>
+            <polygon points="17 9 22 12 17 15 17 9" fill="currentColor"></polygon>
+          </svg>
+        </button>
+
+        <div class="volume-container">
+          <button id="btn-player-mute" class="control-btn-subtle" title="Silenciar">
+            <svg id="icon-volume-high" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+            </svg>
+            <svg id="icon-volume-muted" class="hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              <line x1="23" y1="9" x2="17" y2="15" />
+              <line x1="17" y1="9" x2="23" y2="15" />
+            </svg>
+          </button>
+          <div id="player-volume-bar" class="volume-bar">
+            <div id="player-volume-fill" class="volume-fill"></div>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <!-- CONTENEDOR OCULTO PARA MOTOR YOUTUBE IFRAME (SEAMLESS AUDIO) -->
+    <div id="yt-engine-host" class="yt-engine-host">
+      <div id="yt-player-iframe"></div>
+    </div>
+
+    <!-- ELEMENTO HTML5 AUDIO NATIVO Y ANCLAJE DE FONDO (KEEPALIVE) -->
+    <audio id="native-audio-player" preload="auto" playsinline webkit-playsinline></audio>
+    <audio id="bg-keepalive-audio" preload="auto" loop playsinline webkit-playsinline style="display: none;"></audio>
+
+    <!-- MODAL: CREAR / EDITAR PLAYLIST -->
+    <div id="modal-playlist" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 id="modal-playlist-title" class="modal-title">Crear Playlist</h3>
+          <button id="btn-close-modal-playlist" class="btn-modal-close">✕</button>
+        </div>
+        <form id="form-playlist" class="modal-form">
+          <input type="hidden" id="playlist-form-id" value="" />
+          <input type="hidden" id="playlist-cover-data" value="" />
+          <input type="file" id="playlist-cover-file" accept="image/jpeg,image/png,image/webp" style="display: none;" />
+
+          <div class="playlist-modal-top-layout">
+            <!-- Carátula preview y selector -->
+            <div class="playlist-modal-cover-column">
+              <label class="playlist-modal-section-title">Carátula</label>
+              <div class="playlist-modal-cover-preview" id="playlist-modal-cover-preview" role="button" tabindex="0"
+                title="Haz clic para seleccionar una carátula personalizada">
+                <img id="playlist-modal-cover-img" src="" alt="Carátula" class="playlist-modal-cover-img hidden" />
+                <div id="playlist-modal-cover-placeholder" class="playlist-modal-cover-placeholder">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M9 18V5l12-2v13" />
+                    <circle cx="6" cy="18" r="3" />
+                    <circle cx="18" cy="16" r="3" />
+                  </svg>
+                </div>
+                <div class="playlist-modal-cover-overlay" id="btn-trigger-cover-upload">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                    <circle cx="12" cy="13" r="4" />
+                  </svg>
+                  <span>Cambiar</span>
+                </div>
+              </div>
+              <div class="playlist-modal-cover-btns">
+                <button type="button" class="btn-subir-caratula" id="btn-subir-caratula-action"
+                  title="Subir imagen desde tu dispositivo">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                  <span>Subir imagen</span>
+                </button>
+                <button type="button" class="btn-quitar-caratula hidden" id="btn-quitar-caratula-action"
+                  title="Quitar imagen personalizada">
+                  ✕ Quitar
+                </button>
+              </div>
+            </div>
+
+            <!-- Campos de texto -->
+            <div class="playlist-modal-fields-column">
+              <div class="form-group">
+                <label for="playlist-name-input">Nombre de la playlist</label>
+                <input type="text" id="playlist-name-input" placeholder="p. ej. Cyber Synthwave, Metal Daemon, Relax..."
+                  required />
+              </div>
+              <div class="form-group">
+                <label for="playlist-desc-input">Descripción (opcional)</label>
+                <textarea id="playlist-desc-input" rows="3"
+                  placeholder="Describe el estilo o temática de esta lista..."></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Color distintivo -->
+          <div class="form-group playlist-color-form-group">
+            <div class="playlist-color-heading-row">
+              <label class="playlist-color-section-label">Color distintivo de la playlist</label>
+              <span class="playlist-color-sublabel">Acento visual en carátula, biblioteca y menú lateral</span>
+            </div>
+            <div class="playlist-color-picker-wrap">
+              <div class="playlist-color-presets" id="playlist-color-presets">
+                <button type="button" class="playlist-color-swatch active" data-color="#00f0ff"
+                  style="background: #00f0ff;" title="Cian Cyberpunk"></button>
+                <button type="button" class="playlist-color-swatch" data-color="#a855f7" style="background: #a855f7;"
+                  title="Púrpura Synthwave"></button>
+                <button type="button" class="playlist-color-swatch" data-color="#ec4899" style="background: #ec4899;"
+                  title="Magenta Neón"></button>
+                <button type="button" class="playlist-color-swatch" data-color="#ef4444" style="background: #ef4444;"
+                  title="Rojo Carmesí"></button>
+                <button type="button" class="playlist-color-swatch" data-color="#f97316" style="background: #f97316;"
+                  title="Naranja Láser"></button>
+                <button type="button" class="playlist-color-swatch" data-color="#eab308" style="background: #eab308;"
+                  title="Oro Eléctrico"></button>
+                <button type="button" class="playlist-color-swatch" data-color="#10b981" style="background: #10b981;"
+                  title="Verde Esmeralda"></button>
+                <button type="button" class="playlist-color-swatch" data-color="#06b6d4" style="background: #06b6d4;"
+                  title="Turquesa"></button>
+                <button type="button" class="playlist-color-swatch" data-color="#3b82f6" style="background: #3b82f6;"
+                  title="Azul Neón"></button>
+              </div>
+              <div class="playlist-custom-color-container">
+                <label for="playlist-color-input" class="playlist-custom-color-label"
+                  title="Personalizar con cualquier color">
+                  <input type="color" id="playlist-color-input" value="#00f0ff" class="playlist-native-color-input" />
+                  <span class="playlist-custom-color-preview" id="playlist-custom-color-preview"
+                    style="background: #00f0ff;">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+                      stroke-width="2.5">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="8" x2="12" y2="16" />
+                      <line x1="8" y1="12" x2="16" y2="12" />
+                    </svg>
+                  </span>
+                  <span class="playlist-custom-color-text">Más colores...</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" id="btn-cancel-playlist" class="btn-secondary">Cancelar</button>
+            <button type="submit" class="btn-primary">Guardar Playlist</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL: AÑADIR A PLAYLIST -->
+    <div id="modal-add-to-playlist" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 class="modal-title">Añadir a Playlist</h3>
+          <button id="btn-close-add-modal" class="btn-modal-close">✕</button>
+        </div>
+        <div id="add-modal-song-info" class="modal-song-preview">
+          <!-- Canción que se va a añadir -->
+        </div>
+        <div class="modal-body custom-scroll">
+          <div id="add-modal-playlists-list" class="modal-playlists-selector">
+            <!-- Lista de playlists para elegir -->
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button id="btn-quick-new-playlist" class="btn-secondary">+ Nueva Playlist</button>
+          <button id="btn-cancel-add-modal" class="btn-secondary">Cerrar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: AÑADIR MÚSICA A ÁLBUM / PLAYLIST -->
+    <div id="modal-add-music-album" class="modal-overlay hidden">
+      <div class="modal-card modal-card-wide">
+        <div class="modal-header">
+          <div class="modal-header-icon add-music-header-glow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 18V5l12-2v13" />
+              <circle cx="6" cy="18" r="3" />
+              <circle cx="18" cy="16" r="3" />
+            </svg>
+          </div>
+          <div>
+            <h3 class="modal-title" id="add-music-album-modal-title">Añadir Música al Álbum</h3>
+            <p class="modal-subtitle" id="add-music-album-modal-subtitle">Busca canciones o artistas para añadir a tu
+              álbum</p>
+          </div>
+          <button id="btn-close-add-music-modal" class="btn-modal-close" aria-label="Cerrar modal">✕</button>
+        </div>
+        <div class="modal-body custom-scroll">
+          <div class="add-music-search-box">
+            <div class="search-input-group" style="margin-bottom: 0; flex: 1;">
+              <div class="search-input-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+              </div>
+              <input type="text" id="add-music-search-input" class="search-input"
+                placeholder="Escribe una canción o artista para buscar..." autocomplete="off" />
+              <button id="btn-clear-add-music-search" class="btn-clear-search hidden" title="Borrar búsqueda">✕</button>
+            </div>
+            <button id="btn-add-music-search" class="btn-primary btn-search-trigger btn-neon-accent">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <span>Buscar</span>
+            </button>
+          </div>
+
+          <!-- Sugerencias de búsqueda rápida -->
+          <div class="add-music-chips-row">
+            <span class="add-music-chip" data-query="Top Hits 2026">🔥 Top Hits</span>
+            <span class="add-music-chip" data-query="Synthwave Cyberpunk">⚡ Synthwave</span>
+            <span class="add-music-chip" data-query="Rock Clásico">🎸 Rock</span>
+            <span class="add-music-chip" data-query="Lofi Chill Beats">☕ Lofi</span>
+            <span class="add-music-chip" data-query="Pop Latino">🌴 Latino</span>
+          </div>
+
+          <!-- Estado de carga -->
+          <div id="add-music-loading" class="import-loading-state hidden" style="padding: 22px;">
+            <div class="import-loading-spinner" style="width: 30px; height: 30px;"></div>
+            <div class="import-loading-title" style="font-size: 0.9rem;">Buscando canciones en YouTube...</div>
+          </div>
+
+          <!-- Lista de resultados y recomendaciones -->
+          <div id="add-music-results-list" class="add-music-results-list custom-scroll">
+            <div class="add-music-placeholder">
+              <div class="import-loading-spinner" style="width: 24px; height: 24px; margin-bottom: 8px;"></div>
+              <div>Cargando recomendaciones para este álbum...</div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button id="btn-done-add-music-modal" class="btn-primary btn-neon-accent">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span>Listo</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: EXPORTAR PLAYLIST -->
+    <div id="modal-export-playlist" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-header-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+              <polyline points="16 6 12 2 8 6" />
+              <line x1="12" y1="2" x2="12" y2="15" />
+            </svg>
+          </div>
+          <div>
+            <h3 class="modal-title">Compartir Playlist</h3>
+            <p class="modal-subtitle">Comparte tu playlist con un enlace o descarga el archivo</p>
+          </div>
+          <button id="btn-close-export-modal" class="btn-modal-close">✕</button>
+        </div>
+        <div class="modal-body custom-scroll">
+          <div id="export-summary-box" class="export-summary-box">
+            <!-- Resumen de playlist -->
+          </div>
+
+          <!-- SHARE LINK SECTION -->
+          <div class="share-link-section">
+            <div class="share-link-label">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              </svg>
+              Enlace para compartir
+            </div>
+            <div class="share-link-box">
+              <input id="export-share-link" class="share-link-input" type="text" readonly
+                placeholder="Generando enlace..." />
+              <button id="btn-copy-share-link" class="btn-copy-link" title="Copiar enlace">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
+                Copiar
+              </button>
+            </div>
+            <p class="share-link-hint">Cualquier persona con este enlace podrá importar tu playlist directamente</p>
+          </div>
+
+          <div class="divider-text"><span>O EXPORTAR COMO ARCHIVO</span></div>
+
+          <div class="export-actions-row">
+            <button id="btn-download-json" class="btn-secondary export-action-btn">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              <span>Descargar .json</span>
+            </button>
+            <button id="btn-copy-export-json" class="btn-secondary export-action-btn">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+              <span>Copiar código JSON</span>
+            </button>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button id="btn-cancel-export-modal" class="btn-secondary">Cerrar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: IMPORTAR PLAYLIST -->
+    <div id="modal-import-playlist" class="modal-overlay hidden">
+      <div class="modal-card modal-card-wide">
+        <div class="modal-header">
+          <div class="modal-header-icon import-header-glow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+          </div>
+          <div>
+            <h3 class="modal-title">Importar Playlist</h3>
+            <p class="modal-subtitle">Importa listas de reproducción directamente desde YouTube, Spotify o archivo JSON
+            </p>
+          </div>
+          <button id="btn-close-import-modal" class="btn-modal-close" aria-label="Cerrar modal">✕</button>
+        </div>
+
+        <div class="modal-body custom-scroll">
+          <!-- PLATFORM SELECTOR PILLS -->
+          <div class="import-platform-pills">
+            <div class="import-platform-pill active" data-platform="auto" id="pill-platform-auto">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="2" y1="12" x2="22" y2="12" />
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+              </svg>
+              <span>Auto-detectar</span>
+            </div>
+            <div class="import-platform-pill pill-yt" data-platform="youtube" id="pill-platform-yt">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                <path
+                  d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+              </svg>
+              <span>YouTube</span>
+            </div>
+            <div class="import-platform-pill pill-sp" data-platform="spotify" id="pill-platform-sp">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                <path
+                  d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.503 17.306c-.218.358-.684.47-1.042.253-2.853-1.743-6.445-2.138-10.678-1.171-.41.094-.817-.162-.911-.571-.094-.41.162-.816.571-.91 4.636-1.06 8.607-.611 11.808 1.348.358.218.47.684.252 1.051zm1.47-3.268c-.276.448-.865.59-1.313.314-3.266-2.008-8.245-2.589-12.107-1.417-.503.153-1.037-.135-1.19-.638-.153-.503.136-1.037.639-1.19 4.412-1.339 9.897-.692 13.657 1.618.448.276.59.865.314 1.313zm.126-3.41c-3.917-2.326-10.374-2.541-14.123-1.403-.6.183-1.238-.162-1.42-.762-.183-.6.162-1.238.762-1.42 4.316-1.31 11.442-1.06 15.947 1.614.54.32.715 1.02.395 1.56-.32.539-1.02.714-1.56.395z" />
+              </svg>
+              <span>Spotify</span>
+            </div>
+            <div class="import-platform-pill pill-json" data-platform="json" id="pill-platform-json">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+                <polyline points="10 9 9 9 8 9" />
+              </svg>
+              <span>Archivo / JSON</span>
+            </div>
+          </div>
+
+          <!-- ENLACE URL SECTION -->
+          <div id="import-section-link" class="import-section-active">
+            <div class="share-link-section" style="margin-bottom: 12px;">
+              <div class="share-link-label-row">
+                <label for="import-link-input" class="share-link-label">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                  </svg>
+                  Enlace de YouTube o Spotify
+                </label>
+                <span id="import-detected-badge" class="import-detected-badge hidden"></span>
+              </div>
+              <div class="share-link-box">
+                <input id="import-link-input" class="share-link-input" type="text"
+                  placeholder="https://www.youtube.com/playlist?list=... o https://open.spotify.com/playlist/..." />
+                <button id="btn-import-from-link" class="btn-copy-link btn-import-link">
+                  <span id="btn-import-text" style="display: inline-flex; align-items: center; gap: 6px;">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+                      stroke-width="2.2">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    Cargar
+                  </span>
+                  <span id="btn-import-spinner" class="import-spinner hidden"></span>
+                </button>
+              </div>
+              <div class="import-hint-text">
+                Compatible con enlaces de listas públicas de YouTube, YouTube Music y playlists o álbumes de Spotify.
+              </div>
+            </div>
+          </div>
+
+          <!-- JSON / FILE SECTION (COLLAPSIBLE) -->
+          <div id="import-section-json" class="import-section-json hidden">
+            <div id="import-dropzone" class="import-dropzone">
+              <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.6">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              <div class="dropzone-text">Toca para seleccionar o arrastra un archivo <strong>.json, .csv (Exportify) o
+                  .txt</strong> aquí</div>
+              <input type="file" id="input-import-file" accept=".json,.csv,.txt,application/json,text/csv,text/plain"
+                style="display: none;" />
+            </div>
+
+            <div class="divider-text" style="margin: 12px 0;"><span>O PEGA CÓDIGO JSON, CSV O LISTA DE CANCIONES</span>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <textarea id="import-json-textarea" class="code-textarea" rows="3"
+                placeholder='Pega aquí código JSON, CSV de Exportify o lista de canciones (ej: Artista - Canción)...'
+                spellcheck="false"></textarea>
+            </div>
+
+            <div class="import-hint-text"
+              style="margin-top: 10px; font-size: 0.82rem; opacity: 0.9; line-height: 1.45; padding: 8px 12px; background: rgba(0, 240, 255, 0.05); border: 1px solid rgba(0, 240, 255, 0.15); border-radius: 8px;">
+              💡 <strong>¿Listas grandes de Spotify sin Premium?</strong> Puedes exportar cualquier lista completa
+              gratis en <a href="https://exportify.net" target="_blank" rel="noopener noreferrer"
+                style="color: var(--color-accent); text-decoration: underline; font-weight: 600;">exportify.net</a> y
+              arrastrar el archivo <strong>.csv</strong> aquí para importar todas tus canciones (hasta miles) sin
+              límites.
+            </div>
+          </div>
+
+          <!-- LOADER STATE -->
+          <div id="import-loading-state" class="import-loading-state hidden">
+            <div class="import-loading-spinner"></div>
+            <div class="import-loading-title" id="import-loading-title">Obteniendo playlist...</div>
+            <div class="import-loading-subtitle" id="import-loading-subtitle">Analizando canciones y carátulas</div>
+          </div>
+
+          <!-- PREVIEW BOX -->
+          <div id="import-preview-box" class="import-preview-box hidden">
+            <!-- Vista previa dinámica generada en JS -->
+          </div>
+
+          <!-- FEEDBACK ERROR -->
+          <div id="import-error-msg" class="auth-feedback error hidden"></div>
+        </div>
+
+        <div class="modal-actions">
+          <button id="btn-cancel-import-modal" class="btn-secondary">Cancelar</button>
+          <button id="btn-confirm-import" class="btn-primary" disabled>Importar Playlist</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: ESTADO DE BASE DE DATOS Y ASISTENTE SQL SUPABASE -->
+    <div id="modal-db-status" class="modal-overlay hidden">
+      <div class="modal-card" style="max-width: 540px;">
+        <div class="modal-header">
+          <div class="modal-header-icon" style="background: rgba(0, 240, 255, 0.12); color: var(--accent-cyan);">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+              <ellipse cx="12" cy="5" rx="9" ry="3" />
+              <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+              <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+            </svg>
+          </div>
+          <div>
+            <h3 class="modal-title">Sincronización en la Nube</h3>
+            <p class="modal-subtitle">Base de Datos PostgreSQL (Supabase)</p>
+          </div>
+          <button id="btn-close-db-status" class="btn-modal-close">✕</button>
+        </div>
+
+        <div class="modal-body" style="padding: 20px;">
+          <div id="db-status-info-box"
+            style="margin-bottom: 16px; padding: 14px 16px; border-radius: 10px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08);">
+            <!-- Contenido dinámico del estado -->
+          </div>
+
+          <div style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 18px;">
+            Para que tus canciones <strong>Me gusta</strong>, tus <strong>Playlists</strong> y tu <strong>Configuración
+              personalizada</strong> se sincronicen entre tu teléfono, PC y otros dispositivos, las tablas deben estar
+            creadas en Supabase.
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <button type="button" id="btn-copy-db-sql" class="btn-primary"
+              style="display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 12px; font-weight: 700;">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+              <span>📋 Copiar Script SQL para Supabase</span>
+            </button>
+
+            <a href="https://supabase.com/dashboard/project/_/sql" target="_blank" rel="noopener noreferrer"
+              class="btn-secondary"
+              style="display: flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; padding: 10px; font-size: 0.85rem;">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                <polyline points="15 3 21 3 21 9" />
+                <line x1="10" y1="14" x2="21" y2="3" />
+              </svg>
+              <span>Abrir SQL Editor en Supabase</span>
+            </a>
+
+            <div style="display: flex; gap: 10px; margin-top: 4px;">
+              <button type="button" id="btn-recheck-db" class="btn-secondary"
+                style="flex: 1; padding: 10px; font-size: 0.85rem;">
+                🔄 Verificar Tablas Ahora
+              </button>
+              <button type="button" id="btn-close-db-status-btn" class="btn-secondary"
+                style="flex: 1; padding: 10px; font-size: 0.85rem;">
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: CONFIGURACIÓN DE CUENTA & PREFERENCIAS -->
+    <div id="modal-supabase-auth" class="modal-overlay hidden">
+      <div class="modal-card modal-large">
+        <div class="modal-header">
+          <div class="modal-header-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </div>
+          <div>
+            <h3 class="modal-title">Configuración de la Cuenta</h3>
+            <p class="modal-subtitle">Gestiona tu perfil, preferencias de audio y personalización de DaemonX Music</p>
+          </div>
+          <button id="btn-close-auth-modal" class="btn-modal-close">✕</button>
+        </div>
+
+        <div class="auth-tabs">
+          <button class="auth-tab-btn active" data-tab="tab-account-profile">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"
+              style="margin-right:6px;vertical-align:-2px;">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+            Mi Perfil
+          </button>
+          <button class="auth-tab-btn" data-tab="tab-account-audio">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"
+              style="margin-right:6px;vertical-align:-2px;">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+            </svg>
+            Audio & Reproducción
+          </button>
+          <button class="auth-tab-btn" data-tab="tab-account-app">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"
+              style="margin-right:6px;vertical-align:-2px;">
+              <circle cx="12" cy="12" r="3" />
+              <path
+                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+            Apariencia & Datos
+          </button>
+        </div>
+
+        <div class="modal-body custom-scroll">
+          <!-- TAB 1: MI PERFIL -->
+          <div id="tab-account-profile" class="tab-content active">
+            <div class="profile-card-header">
+              <div class="profile-avatar-large" id="profile-avatar-large">
+                <img id="profile-avatar-img" class="profile-avatar-img hidden" alt="Avatar de Perfil" />
+                <span id="profile-avatar-letter">U</span>
+                <button type="button" class="profile-avatar-badge-btn" id="btn-badge-change-avatar"
+                  title="Cambiar foto de perfil">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                    <circle cx="12" cy="13" r="4" />
+                  </svg>
+                </button>
+              </div>
+              <div class="profile-info-block">
+                <div class="profile-badge-row">
+                  <span class="account-status-badge">⚡ Miembro Activo</span>
+                  <span class="account-plan-badge">DaemonX Cloud Sync</span>
+                </div>
+                <div class="profile-name-container">
+                  <div id="profile-name-display-wrap" class="profile-name-display-wrap">
+                    <h4 id="profile-card-name" class="profile-card-name">Usuario</h4>
+                    <button type="button" id="btn-edit-profile-name" class="btn-edit-profile-name"
+                      title="Cambiar nombre" aria-label="Cambiar nombre">
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+                        stroke-width="2">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                      </svg>
+                    </button>
+                  </div>
+                  <form id="form-profile-displayname" class="profile-name-edit-form hidden">
+                    <input type="text" id="input-profile-alias" class="input-profile-inline"
+                      placeholder="Escribe tu nombre..." maxlength="40" autocomplete="off" />
+                    <button type="submit" id="btn-save-profile-name" class="btn-name-action btn-name-save"
+                      title="Guardar nombre" aria-label="Guardar nombre">
+                      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+                        stroke-width="2.5">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </button>
+                    <button type="button" id="btn-cancel-profile-name" class="btn-name-action btn-name-cancel"
+                      title="Cancelar edición" aria-label="Cancelar">
+                      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+                        stroke-width="2.5">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  </form>
+                </div>
+                <p id="profile-card-email" class="profile-card-email">cargando...</p>
+              </div>
+            </div>
+
+            <!-- SECCIÓN: FOTO DE PERFIL (PREDETERMINADAS + PERSONALIZADA ANTI-XSS) -->
+            <div class="profile-avatar-section">
+              <div class="section-title-row">
+                <h5 class="avatar-section-title">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 8v8M8 12h8" />
+                  </svg>
+                  Foto de Perfil
+                </h5>
+                <span class="security-shield-badge"
+                  title="Seguridad activa: validación binaria, Canvas 2D sandbox y filtrado anti-XSS">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  </svg>
+                  Protegido Anti-XSS
+                </span>
+              </div>
+
+              <!-- 3 Avatares Predeterminados -->
+              <div class="avatar-presets-container">
+                <div class="avatar-presets-label">Elige un avatar oficial Cyberpunk:</div>
+                <div class="avatar-presets-grid" id="avatar-presets-grid">
+                  <button type="button" class="avatar-preset-btn" data-preset="/avatars/preset-1.svg"
+                    title="Cyber Shinobi">
+                    <div class="preset-img-wrapper">
+                      <img src="/avatars/preset-1.svg" alt="Cyber Shinobi" loading="lazy" />
+                    </div>
+                    <span class="preset-name">Shinobi</span>
+                    <span class="preset-badge">Operativo</span>
+                  </button>
+                  <button type="button" class="avatar-preset-btn" data-preset="/avatars/preset-2.svg"
+                    title="Synthwave Pilot">
+                    <div class="preset-img-wrapper">
+                      <img src="/avatars/preset-2.svg" alt="Synthwave Pilot" loading="lazy" />
+                    </div>
+                    <span class="preset-name">Pilot DJ</span>
+                    <span class="preset-badge">Synthwave</span>
+                  </button>
+                  <button type="button" class="avatar-preset-btn" data-preset="/avatars/preset-3.svg"
+                    title="Neural Phantom">
+                    <div class="preset-img-wrapper">
+                      <img src="/avatars/preset-3.svg" alt="Neural Phantom" loading="lazy" />
+                    </div>
+                    <span class="preset-name">Phantom</span>
+                    <span class="preset-badge">Netrunner</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Carga de Imagen Personalizada -->
+              <div class="avatar-custom-upload-box" id="avatar-dropzone">
+                <input type="file" id="input-avatar-file" accept="image/jpeg,image/png,image/webp" class="hidden" />
+                <div class="avatar-upload-content">
+                  <div class="avatar-upload-icon-circle">
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="17 8 12 3 7 8" />
+                      <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                  </div>
+                  <div class="avatar-upload-text">
+                    <div class="upload-primary-text">Sube tu foto personalizada</div>
+                    <div class="upload-subtext">JPG, PNG o WEBP (Máx. 5 MB) · Arrastra o selecciona</div>
+                  </div>
+                  <div class="avatar-upload-actions">
+                    <button type="button" class="btn-avatar-upload" id="btn-trigger-avatar-file">
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+                        stroke-width="2">
+                        <circle cx="12" cy="12" r="3" />
+                        <path
+                          d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                      </svg>
+                      Elegir Foto
+                    </button>
+                    <button type="button" class="btn-avatar-reset" id="btn-reset-avatar"
+                      title="Quitar foto y usar iniciales">
+                      ✕ Quitar Foto
+                    </button>
+                  </div>
+                </div>
+                <!-- Mensaje de estado/seguridad dinámico -->
+                <div id="avatar-security-feedback" class="avatar-security-feedback hidden"></div>
+              </div>
+            </div>
+
+            <div class="profile-stats-grid">
+              <div class="profile-stat-box">
+                <span class="stat-number" id="profile-stat-playlists">0</span>
+                <span class="stat-label">Playlists</span>
+              </div>
+              <div class="profile-stat-box">
+                <span class="stat-number" id="profile-stat-favorites">0</span>
+                <span class="stat-label">Me Gusta</span>
+              </div>
+              <div class="profile-stat-box">
+                <span class="stat-number" id="profile-stat-history">0</span>
+                <span class="stat-label">Escuchadas</span>
+              </div>
+            </div>
+
+
+            <div class="danger-zone-box" style="margin-top: 20px;">
+              <div class="danger-zone-text">
+                <div style="font-weight: 600; color: #fff;">Sesión Actual</div>
+                <div style="font-size: 0.8rem; color: var(--text-muted);">Cierra la sesión activa en este navegador de
+                  forma segura.</div>
+              </div>
+              <button type="button" id="btn-modal-signout" class="btn-secondary text-danger">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                <span>Cerrar Sesión</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- TAB 2: AUDIO & REPRODUCCIÓN -->
+          <div id="tab-account-audio" class="tab-content">
+            <p class="tab-description">Ajusta la calidad del sonido, las transiciones y el comportamiento del
+              reproductor.</p>
+
+            <div class="settings-group">
+              <div class="setting-row setting-stacked">
+                <div class="setting-text">
+                  <div class="setting-title">Calidad de Streaming</div>
+                  <div class="setting-desc">Ajusta la fidelidad de audio según tu conexión a internet</div>
+                </div>
+                <select id="pref-audio-quality" class="setting-select">
+                  <option value="high" selected>Ultra HQ (320 kbps)</option>
+                  <option value="medium">Alta Fidelidad (256 kbps)</option>
+                  <option value="saver">Ahorro de Datos (128 kbps)</option>
+                </select>
+              </div>
+
+              <div class="setting-row setting-stacked">
+                <div class="setting-text">
+                  <div class="setting-title">Fundido Cruzado (Crossfade)</div>
+                  <div class="setting-desc">Transición suave entre el final de un tema y el inicio del siguiente</div>
+                </div>
+                <div class="setting-slider-wrap">
+                  <input type="range" id="pref-crossfade" min="0" max="10" step="1" value="3" class="setting-slider" />
+                  <span id="pref-crossfade-val" class="slider-val-badge">3s</span>
+                </div>
+              </div>
+
+              <div class="setting-row setting-toggle">
+                <div class="setting-text">
+                  <div class="setting-title">Normalización de Volumen</div>
+                  <div class="setting-desc">Equilibra automáticamente el nivel de audio en todas las pistas</div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="pref-volume-norm" checked />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+
+              <div class="setting-row setting-toggle">
+                <div class="setting-text">
+                  <div class="setting-title">Reproducción Continua (Autoplay)</div>
+                  <div class="setting-desc">Continúa reproduciendo pistas recomendadas al terminar tu cola</div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="pref-autoplay" checked />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 3: APARIENCIA & DATOS -->
+          <div id="tab-account-app" class="tab-content">
+            <p class="tab-description">Personaliza la estética de la interfaz y gestiona el almacenamiento local de la
+              aplicación.</p>
+
+            <div class="settings-group">
+              <div class="setting-row setting-stacked">
+                <div class="setting-text">
+                  <div class="setting-title">Color de Acento Neón</div>
+                  <div class="setting-desc">Selecciona la tonalidad visual predominante de la interfaz</div>
+                </div>
+                <div class="theme-colors-palette">
+                  <button type="button" class="theme-color-btn active" data-color="#00f0ff" style="background:#00f0ff;"
+                    title="Cian Neón"></button>
+                  <button type="button" class="theme-color-btn" data-color="#a855f7" style="background:#a855f7;"
+                    title="Púrpura Cyberpunk"></button>
+                  <button type="button" class="theme-color-btn" data-color="#ec4899" style="background:#ec4899;"
+                    title="Rosa Neón"></button>
+                  <button type="button" class="theme-color-btn" data-color="#10b981" style="background:#10b981;"
+                    title="Esmeralda"></button>
+                  <button type="button" class="theme-color-btn" data-color="#f59e0b" style="background:#f59e0b;"
+                    title="Ámbar Gold"></button>
+                </div>
+              </div>
+
+              <div class="setting-row setting-toggle">
+                <div class="setting-text">
+                  <div class="setting-title">Efectos Glassmorphism & Desenfoque</div>
+                  <div class="setting-desc">Desactívalo si deseas ahorrar recursos de GPU o batería</div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="pref-glass-effects" checked />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+
+              <div class="setting-row setting-stacked">
+                <div class="setting-text">
+                  <div class="setting-title">Limpiar Historial de Reproducción</div>
+                  <div class="setting-desc">Borra la lista de temas escuchados recientemente</div>
+                </div>
+                <button type="button" id="btn-clear-history-pref" class="btn-secondary"
+                  style="padding: 9px 16px; font-size: 0.84rem;">
+                  Vaciar Historial
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" id="btn-cancel-auth-modal" class="btn-secondary" style="width: 100%;">Cerrar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANEL / MODAL DE LETRAS SINCRONIZADAS (LYRICS) -->
+    <div id="lyrics-modal" class="lyrics-modal">
+      <div id="lyrics-overlay" class="lyrics-overlay"></div>
+      <div class="lyrics-window">
+        <div id="lyrics-ambient-bg" class="lyrics-ambient-bg"></div>
+
+        <!-- Header del visor de letras -->
+        <header class="lyrics-header">
+          <div class="lyrics-header-top-bar">
+            <div class="lyrics-header-left">
+              <div class="lyrics-header-thumb-wrap">
+                <img id="lyrics-header-thumb" src="/daemonx-logo.svg" alt="Cover" class="lyrics-header-thumb" />
+              </div>
+              <div class="lyrics-header-meta">
+                <h2 id="lyrics-header-title" class="lyrics-title" title="DaemonX Music">DaemonX Music</h2>
+                <div class="lyrics-header-subline">
+                  <span id="lyrics-header-artist" class="lyrics-artist" title="Cargando...">Cargando letras...</span>
+                  <span class="lyrics-subline-divider" aria-hidden="true">•</span>
+                  <span id="lyrics-sync-badge" class="lyrics-badge lyrics-badge-loading">Cargando</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="lyrics-header-actions">
+              <!-- Selector tamaño tipografía -->
+              <div class="lyrics-font-controls" title="Tamaño de letra">
+                <button id="btn-lyrics-size-down" class="lyrics-tool-btn lyrics-size-btn" title="Reducir tamaño (A-)">
+                  <span>A-</span>
+                </button>
+                <span id="lyrics-size-label" class="lyrics-size-badge">A</span>
+                <button id="btn-lyrics-size-up" class="lyrics-tool-btn lyrics-size-btn" title="Aumentar tamaño (A+)">
+                  <span>A+</span>
+                </button>
+              </div>
+
+              <!-- Botón auto-scroll toggle -->
+              <button id="btn-lyrics-autoscroll" class="lyrics-tool-btn active" title="Desplazamiento automático">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 5v14M19 12l-7 7-7-7" />
+                </svg>
+                <span class="tool-btn-text">Auto</span>
+              </button>
+
+              <!-- Botón cambiar fuente / otra versión -->
+              <button id="btn-lyrics-switch-source" class="lyrics-tool-btn"
+                title="Buscar letra en otra fuente o versión">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 2v6h-6"></path>
+                  <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
+                  <path d="M3 22v-6h6"></path>
+                  <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+                </svg>
+                <span class="tool-btn-text">Fuentes</span>
+              </button>
+
+              <!-- Botón calibrar sincronización de voz y subtítulos -->
+              <button id="btn-lyrics-sync-offset" class="lyrics-tool-btn"
+                title="Calibrar sincronización entre voz y subtítulos">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                <span class="tool-btn-text" id="lyrics-sync-offset-label">Sync</span>
+              </button>
+
+              <!-- Botón toggle búsqueda manual -->
+              <button id="btn-lyrics-search-toggle" class="lyrics-tool-btn" title="Buscar letra manualmente">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+              </button>
+
+              <!-- Botón copiar letra -->
+              <button id="btn-lyrics-copy" class="lyrics-tool-btn" title="Copiar letra">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+              </button>
+
+              <!-- Botón pegar o escribir letra propia -->
+              <button id="btn-lyrics-custom-toggle" class="lyrics-tool-btn" title="Escribir o pegar letra propia">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 20h9"></path>
+                  <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                </svg>
+              </button>
+            </div>
+
+            <!-- Botón cerrar -->
+            <button id="btn-lyrics-close" class="lyrics-close-btn" aria-label="Cerrar letras"
+              title="Cerrar letras (Esc)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+        </header>
+
+        <!-- Barra de búsqueda manual opcional -->
+        <div id="lyrics-manual-search-box" class="lyrics-manual-search-box hidden">
+          <div class="lyrics-search-input-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="lyrics-search-icon">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="lyrics-manual-search-input" placeholder="Buscar artista o título de canción..."
+              class="lyrics-search-input" />
+            <button id="btn-lyrics-manual-search-submit" class="btn-primary lyrics-search-btn">Buscar</button>
+          </div>
+        </div>
+
+        <!-- Editor de Letra Personalizada (Guardado permanente por el usuario) -->
+        <div id="lyrics-custom-editor-box" class="lyrics-custom-editor-box hidden">
+          <div class="lyrics-editor-header">
+            <span class="lyrics-editor-title">✏️ Letra personal para esta pista</span>
+            <button type="button" id="btn-lyrics-editor-close" class="lyrics-editor-close">&times;</button>
+          </div>
+          <p class="lyrics-editor-hint">Pega o escribe la letra (de Google, Genius o tus notas). Se guardará
+            exclusivamente para esta canción.</p>
+          <textarea id="lyrics-custom-textarea" class="lyrics-custom-textarea"
+            placeholder="Pega los versos de la canción aquí..."></textarea>
+          <div class="lyrics-editor-actions">
+            <button type="button" id="btn-lyrics-save-custom" class="btn-primary">Guardar Letra</button>
+            <button type="button" id="btn-lyrics-delete-custom" class="btn-secondary hidden"
+              style="color: #ef4444; border-color: rgba(239,68,68,0.4);">Borrar guardada</button>
+            <button type="button" id="btn-lyrics-cancel-custom" class="btn-secondary">Cancelar</button>
+          </div>
+        </div>
+
+        <!-- Selector de fuentes / versiones alternativas -->
+        <div id="lyrics-sources-dialog" class="lyrics-sources-dialog hidden">
+          <div class="lyrics-sources-header">
+            <div class="lyrics-sources-header-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                style="width: 18px; height: 18px; color: var(--accent-cyan);">
+                <path d="M21 2v6h-6"></path>
+                <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
+                <path d="M3 22v-6h6"></path>
+                <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+              </svg>
+              <span>Fuentes y versiones de letra disponibles</span>
+            </div>
+            <button type="button" id="btn-lyrics-sources-close" class="lyrics-sources-close-btn"
+              aria-label="Cerrar">✕</button>
+          </div>
+          <div id="lyrics-sources-list" class="lyrics-sources-list">
+            <!-- Renderizado dinámico de versiones encontradas -->
+          </div>
+        </div>
+
+        <!-- Calibrador interactivo de sincronización (voz y subtítulos) -->
+        <div id="lyrics-sync-dialog" class="lyrics-sync-dialog hidden">
+          <div class="lyrics-sync-dialog-header">
+            <div class="lyrics-sync-dialog-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                style="width: 18px; height: 18px; color: var(--accent-cyan);">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+              <span>Calibrar Sincronización</span>
+            </div>
+            <button type="button" id="btn-lyrics-sync-close" class="lyrics-sources-close-btn"
+              aria-label="Cerrar">✕</button>
+          </div>
+          <p class="lyrics-sync-hint">Ajusta el desfase si la voz y los subtítulos van a diferente ritmo:</p>
+          <div class="lyrics-sync-controls-row">
+            <button type="button" class="btn-sync-adjust" data-step="-1.0"
+              title="Retrasar subtítulos 1.0s">-1.0s</button>
+            <button type="button" class="btn-sync-adjust" data-step="-0.5"
+              title="Retrasar subtítulos 0.5s">-0.5s</button>
+            <button type="button" class="btn-sync-adjust" data-step="-0.2"
+              title="Retrasar subtítulos 0.2s">-0.2s</button>
+            <button type="button" class="btn-sync-adjust" data-step="-0.1"
+              title="Retrasar subtítulos 0.1s">-0.1s</button>
+            <div class="lyrics-sync-current-val" id="lyrics-sync-val-display" title="Desfase actual en segundos">0.0s
+            </div>
+            <button type="button" class="btn-sync-adjust" data-step="+0.1"
+              title="Adelantar subtítulos 0.1s">+0.1s</button>
+            <button type="button" class="btn-sync-adjust" data-step="+0.2"
+              title="Adelantar subtítulos 0.2s">+0.2s</button>
+            <button type="button" class="btn-sync-adjust" data-step="+0.5"
+              title="Adelantar subtítulos 0.5s">+0.5s</button>
+            <button type="button" class="btn-sync-adjust" data-step="+1.0"
+              title="Adelantar subtítulos 1.0s">+1.0s</button>
+          </div>
+          <div class="lyrics-sync-footer">
+            <button type="button" id="btn-lyrics-sync-align-vocal" class="btn-secondary lyrics-sync-align-btn"
+              title="Ajustar desfase para que el subtítulo coincida exactamente con lo que suena ahora">🎯 Alinear con
+              voz actual</button>
+            <button type="button" id="btn-lyrics-sync-reset" class="btn-secondary lyrics-sync-reset-btn">Restablecer
+              (0.0s)</button>
+            <span class="lyrics-sync-saved-pill">Guardado para esta canción</span>
+          </div>
+        </div>
+
+        <!-- Contenedor principal de letras -->
+        <div id="lyrics-lines-container" class="lyrics-lines-container lyrics-size-md">
+          <!-- Renderizado dinámico de líneas sincronizadas o texto estático -->
+        </div>
+
+        <!-- Botón flotante para reanudar sincronización al hacer scroll manual -->
+        <button id="btn-lyrics-resume-sync" class="lyrics-resume-sync-btn hidden">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="13 17 18 12 13 7"></polyline>
+            <polyline points="6 17 11 12 6 7"></polyline>
+          </svg>
+          <span>Reanudar sincronización</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- PANEL DE PLAYER EXPANDIDO (solo mobile) -->
+    <div id="mobile-player-sheet" class="mobile-player-sheet">
+      <div class="sheet-drag-handle"></div>
+      <div class="sheet-header">
+        <button id="btn-sheet-close" class="sheet-close-btn" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <span class="sheet-subtitle">Reproduciendo ahora</span>
+        <div class="sheet-header-actions">
+          <button id="btn-sheet-lyrics" class="sheet-action-btn" title="Letras" aria-label="Letras">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+              <line x1="12" y1="19" x2="12" y2="22"></line>
+              <line x1="8" y1="22" x2="16" y2="22"></line>
+            </svg>
+          </button>
+          <button id="btn-sheet-queue" class="sheet-action-btn" title="Cola" aria-label="Cola">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="12" x2="15" y2="12"></line>
+              <line x1="3" y1="18" x2="18" y2="18"></line>
+              <polygon points="17 9 22 12 17 15 17 9" fill="currentColor"></polygon>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="sheet-artwork">
+        <img id="sheet-thumb" src="/daemonx-logo.svg" alt="Cover" class="sheet-cover" />
+        <div class="sheet-artwork-glow"></div>
+      </div>
+
+      <div class="sheet-track-info">
+        <div class="sheet-track-main">
+          <div class="sheet-track-texts">
+            <div id="sheet-track-title" class="sheet-title">DaemonX Music</div>
+            <div id="sheet-track-artist" class="sheet-artist">Listo para reproducir</div>
+          </div>
+          <button id="btn-sheet-like" class="sheet-like-btn" title="Favorito">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path
+                d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="sheet-progress">
+        <div id="sheet-seekbar" class="sheet-seekbar">
+          <div id="sheet-seek-fill" class="sheet-seek-fill"></div>
+          <div id="sheet-seek-thumb" class="sheet-seek-thumb"></div>
+        </div>
+        <div class="sheet-times">
+          <span id="sheet-time-current">0:00</span>
+          <span id="sheet-time-total">0:00</span>
+        </div>
+      </div>
+
+      <div class="sheet-controls">
+        <button id="btn-sheet-shuffle" class="sheet-ctrl-btn" title="Aleatorio">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="16 3 21 3 21 8" />
+            <line x1="4" y1="20" x2="21" y2="3" />
+            <polyline points="21 16 21 21 16 21" />
+            <line x1="15" y1="15" x2="21" y2="21" />
+            <line x1="4" y1="4" x2="9" y2="9" />
+          </svg>
+        </button>
+        <button id="btn-sheet-prev" class="sheet-ctrl-btn sheet-ctrl-main" title="Anterior">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="19 20 9 12 19 4 19 20" />
+            <line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2" />
+          </svg>
+        </button>
+        <button id="btn-sheet-play" class="sheet-ctrl-btn sheet-ctrl-play" title="Reproducir">
+          <svg id="icon-sheet-play" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="6 4 20 12 6 20 6 4" />
+          </svg>
+          <svg id="icon-sheet-pause" class="hidden" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="6" y="4" width="4" height="16" />
+            <rect x="14" y="4" width="4" height="16" />
+          </svg>
+        </button>
+        <button id="btn-sheet-next" class="sheet-ctrl-btn sheet-ctrl-main" title="Siguiente">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="5 4 15 12 5 20 5 4" />
+            <line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2" />
+          </svg>
+        </button>
+        <button id="btn-sheet-repeat" class="sheet-ctrl-btn" title="Repetir">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="17 1 21 5 17 9" />
+            <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+            <polyline points="7 23 3 19 7 15" />
+            <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="sheet-volume">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="sheet-vol-icon">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+        </svg>
+        <div id="sheet-volume-bar" class="sheet-vol-bar">
+          <div id="sheet-volume-fill" class="sheet-vol-fill"></div>
+        </div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="sheet-vol-icon">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+        </svg>
+      </div>
+    </div>
+    <div id="mobile-sheet-overlay" class="mobile-sheet-overlay"></div>
+
+    <!-- BARRA DE NAVEGACIÓN INFERIOR (solo mobile) -->
+    <nav id="mobile-bottom-nav" class="mobile-bottom-nav">
+      <button class="mobile-nav-item active" data-view="home">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <polyline points="9 22 9 12 15 12 15 22" />
+        </svg>
+        <span>Inicio</span>
+      </button>
+      <button class="mobile-nav-item" data-view="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+        <span>Buscar</span>
+      </button>
+      <button class="mobile-nav-item" data-view="library">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
+        </svg>
+        <span>Biblioteca</span>
+      </button>
+      <button class="mobile-nav-item" data-view="favorites">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path
+            d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+        </svg>
+        <span>Me Gusta</span>
+      </button>
+      <button class="mobile-nav-item" data-view="history">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10" />
+          <polyline points="12 6 12 12 16 14" />
+        </svg>
+        <span>Historial</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- TOAST NOTIFICACIONES FLOTANTES (Nivel raíz de página) -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- MODAL: CAMBIAR / RESTABLECER CONTRASEÑA (RECOVERY EMAIL) -->
+  <div id="modal-reset-password" class="modal-overlay modal-recovery hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-header-icon" style="background: rgba(168, 85, 247, 0.15); color: var(--accent-purple);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+        </div>
+        <div>
+          <h3 class="modal-title">Nueva Contraseña</h3>
+          <p class="modal-subtitle">Establece tu nueva clave de acceso para tu cuenta de DaemonX</p>
+        </div>
+        <button type="button" id="btn-close-modal-reset" class="btn-modal-close" title="Cerrar y volver">✕</button>
+      </div>
+      <form id="form-reset-password" class="modal-form">
+        <div class="form-group">
+          <label for="reset-new-password">Nueva Contraseña</label>
+          <input type="password" id="reset-new-password" placeholder="Mínimo 6 caracteres" required minlength="6"
+            autocomplete="new-password" />
+        </div>
+        <div class="form-group">
+          <label for="reset-confirm-password">Confirmar Nueva Contraseña</label>
+          <input type="password" id="reset-confirm-password" placeholder="Repite la contraseña" required minlength="6"
+            autocomplete="new-password" />
+        </div>
+        <div id="reset-feedback" class="gate-feedback hidden"></div>
+        <div class="modal-actions" style="margin-top: 14px; display: flex; flex-direction: column; gap: 8px;">
+          <button type="submit" id="btn-submit-reset-password" class="btn-primary"
+            style="width: 100%; justify-content: center;">
+            Guardar Contraseña y Entrar
+          </button>
+          <button type="button" id="btn-cancel-reset" class="btn-secondary"
+            style="width: 100%; justify-content: center;">
+            Cancelar y volver al Inicio
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: SOLICITAR RECUPERACIÓN DE CONTRASEÑA -->
+  <div id="modal-forgot-password" class="modal-overlay modal-recovery hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-header-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+            <polyline points="22,6 12,13 2,6"></polyline>
+          </svg>
+        </div>
+        <div>
+          <h3 class="modal-title">Recuperar Contraseña</h3>
+          <p class="modal-subtitle">Te enviaremos un enlace de recuperación a tu correo</p>
+        </div>
+        <button type="button" id="btn-close-modal-forgot" class="btn-modal-close" title="Cerrar">✕</button>
+      </div>
+      <form id="form-forgot-password" class="modal-form">
+        <div class="form-group">
+          <label for="forgot-email">Correo Electrónico o Usuario</label>
+          <input type="text" id="forgot-email" placeholder="usuario@correo.com o tu usuario" required />
+        </div>
+        <div id="forgot-feedback" class="gate-feedback hidden"></div>
+        <div class="modal-actions">
+          <button type="button" id="btn-cancel-forgot" class="btn-secondary">Cancelar</button>
+          <button type="submit" id="btn-submit-forgot" class="btn-primary">Enviar Enlace</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- App Core -->
+</body>
+
+</html>

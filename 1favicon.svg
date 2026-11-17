@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <defs>
+    <linearGradient id="favGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff0055" />
+      <stop offset="100%" stop-color="#8b00ff" />
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="28" fill="#0b0d14"/>
+  <path d="M26 30 C 24 16, 35 12, 40 22 C 37 32, 33 38, 30 46 Z" fill="url(#favGlow)" />
+  <path d="M74 30 C 76 16, 65 12, 60 22 C 63 32, 67 38, 70 46 Z" fill="url(#favGlow)" />
+  <rect x="34" y="44" width="5" height="22" rx="2.5" fill="url(#favGlow)" />
+  <rect x="43" y="36" width="5" height="34" rx="2.5" fill="#00f0ff" />
+  <rect x="52" y="30" width="5" height="42" rx="2.5" fill="#ff0055" />
+  <rect x="61" y="40" width="5" height="28" rx="2.5" fill="#8b00ff" />
+</svg>

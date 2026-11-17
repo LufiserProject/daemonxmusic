@@ -1,0 +1,65 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[build.environment]
+  VITE_SUPABASE_URL = "https://kmytitnkjrayqnxqdqap.supabase.co"
+  VITE_SUPABASE_ANON_KEY = "sb_publishable_99hMAFTIDTcYsMRbMC58Yw_CQjGH-Oa"
+
+[functions]
+  node_bundler = "esbuild"
+  included_files = ["netlify/functions/**"]
+
+[[redirects]]
+  from = "/api/buscar"
+  to = "/.netlify/functions/buscar"
+  status = 200
+
+[[redirects]]
+  from = "/api/reproducir"
+  to = "/.netlify/functions/reproducir"
+  status = 200
+
+[[redirects]]
+  from = "/api/stream"
+  to = "/.netlify/functions/stream"
+  status = 200
+
+[[redirects]]
+  from = "/api/importar"
+  to = "/.netlify/functions/importar"
+  status = 200
+
+[[redirects]]
+  from = "/api/lyrics"
+  to = "/.netlify/functions/lyrics"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/*.svg"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"

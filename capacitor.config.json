@@ -1,0 +1,30 @@
+{
+  "appId": "com.daemonx.music",
+  "appName": "DaemonX Music",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "server": {
+    "iosScheme": "capacitor",
+    "allowNavigation": [
+      "daemonx-music.netlify.app",
+      "*.supabase.co",
+      "*.youtube.com",
+      "*.googlevideo.com",
+      "*.ytimg.com",
+      "lrclib.net",
+      "api.lyrics.ovh"
+    ]
+  },
+  "ios": {
+    "contentInset": "always",
+    "backgroundColor": "#070913",
+    "preferredContentMode": "mobile",
+    "scrollEnabled": true,
+    "scheme": "DaemonX Music"
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
+}

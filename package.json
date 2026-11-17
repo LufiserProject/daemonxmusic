@@ -1,0 +1,32 @@
+{
+  "name": "daemonx-music",
+  "version": "1.2.0",
+  "description": "DaemonX Music Player - High Fidelity Private Streaming for iOS & Web",
+  "private": true,
+  "main": "index.html",
+  "scripts": {
+    "cap:add:ios": "cap add ios",
+    "cap:sync": "cap sync ios",
+    "cap:copy": "cap copy ios",
+    "build:ipa": "node scripts/build-ipa.js"
+  },
+  "keywords": [
+    "music",
+    "player",
+    "ios",
+    "ipa",
+    "capacitor",
+    "streaming"
+  ],
+  "author": "DaemonX Team",
+  "license": "MIT",
+  "dependencies": {
+    "@capacitor/core": "^7.0.1",
+    "@capacitor/ios": "^7.0.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.0.1",
+    "archiver": "^8.0.0",
+    "isomorphic-git": "^1.44.16"
+  }
+}

@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <defs>
+    <linearGradient id="synthGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff007f" />
+      <stop offset="50%" stop-color="#ffaa00" />
+      <stop offset="100%" stop-color="#7928ca" />
+    </linearGradient>
+    <linearGradient id="visorGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ff007f" />
+      <stop offset="50%" stop-color="#ff7700" />
+      <stop offset="100%" stop-color="#00f0ff" />
+    </linearGradient>
+    <radialGradient id="bgGrad2" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1c102a" />
+      <stop offset="100%" stop-color="#090510" />
+    </radialGradient>
+    <filter id="synthGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2.5" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background Base -->
+  <circle cx="60" cy="60" r="58" fill="url(#bgGrad2)" stroke="url(#synthGrad)" stroke-width="2.5" />
+  
+  <!-- Headphones Headband -->
+  <path d="M26 56 C24 24, 96 24, 94 56" stroke="url(#synthGrad)" stroke-width="5" stroke-linecap="round" fill="none" />
+  <path d="M34 50 C34 32, 86 32, 86 50" stroke="#ffaa00" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.6" />
+
+  <!-- Helmet Shell -->
+  <path d="M34 46 C34 30, 86 30, 86 46 L86 64 C86 82, 74 92, 60 94 C46 92, 34 82, 34 64 Z" fill="#120c1f" stroke="url(#synthGrad)" stroke-width="2" />
+
+  <!-- DJ Ear Cups -->
+  <rect x="20" y="50" width="12" height="24" rx="6" fill="#1c102a" stroke="url(#synthGrad)" stroke-width="2" filter="url(#synthGlow)" />
+  <circle cx="26" cy="62" r="3" fill="#00f0ff" />
+  <rect x="88" y="50" width="12" height="24" rx="6" fill="#1c102a" stroke="url(#synthGrad)" stroke-width="2" filter="url(#synthGlow)" />
+  <circle cx="94" cy="62" r="3" fill="#00f0ff" />
+
+  <!-- Synthwave Grid Sunset Visor -->
+  <path d="M38 52 C38 48, 82 48, 82 52 L82 68 C82 74, 72 78, 60 78 C48 78, 38 74, 38 68 Z" fill="url(#visorGrad)" opacity="0.95" filter="url(#synthGlow)" />
+  <!-- Grid Lines inside Visor -->
+  <line x1="42" y1="58" x2="78" y2="58" stroke="#ffffff" stroke-width="1" opacity="0.7" />
+  <line x1="44" y1="64" x2="76" y2="64" stroke="#ffffff" stroke-width="1" opacity="0.7" />
+  <line x1="48" y1="70" x2="72" y2="70" stroke="#ffffff" stroke-width="1" opacity="0.7" />
+  <line x1="60" y1="52" x2="60" y2="78" stroke="#ffffff" stroke-width="1" opacity="0.5" />
+  <line x1="50" y1="52" x2="46" y2="78" stroke="#ffffff" stroke-width="0.8" opacity="0.4" />
+  <line x1="70" y1="52" x2="74" y2="78" stroke="#ffffff" stroke-width="0.8" opacity="0.4" />
+
+  <!-- Chin / Audio Jack Accent -->
+  <polygon points="54,84 66,84 63,90 57,90" fill="#00f0ff" />
+  <circle cx="60" cy="87" r="1.5" fill="#120c1f" />
+</svg>
