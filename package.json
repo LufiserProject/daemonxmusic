@@ -5,7 +5,7 @@
   "private": true,
   "main": "index.html",
   "scripts": {
-    "cap:add:ios": "cap add ios",
+    "build": "node scripts/prepare-www.js",
     "cap:sync": "cap sync ios",
     "cap:copy": "cap copy ios",
     "build:ipa": "node scripts/build-ipa.js"
@@ -26,7 +26,7 @@
   },
   "devDependencies": {
     "@capacitor/cli": "^7.0.1",
-    "archiver": "^8.0.0",
+    "archiver": "^7.0.1",
     "isomorphic-git": "^1.44.16"
   }
 }

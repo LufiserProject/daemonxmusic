@@ -1,4 +1,4 @@
-name: Build iOS IPA (DaemonX Music)
+name: Compilar IPA (iOS)
 
 on:
   push:
@@ -7,56 +7,74 @@ on:
 
 jobs:
   build-ios:
-    name: Build & Package iOS IPA
-    runs-on: macos-14
+    name: Compilar IPA (iOS) en macOS
+    runs-on: macos-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Descargar repositorio
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
 
-      - name: Install Dependencies
-        run: |
-          npm install
+      - name: Instalar dependencias npm
+        run: npm install
 
-      - name: Sync Web Assets to Native iOS Project
-        run: |
-          node scripts/prepare-www.js
-          npx cap sync ios
+      - name: Compilar proyecto web
+        run: npm run build
 
-      - name: Install Pods
+      - name: Sincronizar Capacitor iOS
+        run: npx cap sync ios
+
+      - name: Compilar y empaquetar IPA
         run: |
           cd ios/App
-          pod install --repo-update
-
-      - name: Build Xcode Archive (Release)
-        run: |
-          xcodebuild -workspace ios/App/App.xcworkspace \
+          ARCHIVE_SUCCESS=false
+          if xcodebuild clean archive \
+            -workspace App.xcworkspace \
             -scheme App \
             -configuration Release \
             -destination 'generic/platform=iOS' \
-            -archivePath build/DaemonX.xcarchive \
+            -archivePath build/App.xcarchive \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            PROVISIONING_PROFILE="" \
-            clean archive
+            CODE_SIGN_IDENTITY=""; then
+            ARCHIVE_SUCCESS=true
+          fi
 
-      - name: Package Payload into DaemonX-Music.ipa
-        run: |
-          mkdir -p Payload
-          cp -r build/DaemonX.xcarchive/Products/Applications/App.app Payload/DaemonX.app
-          zip -r -9 DaemonX-Music.ipa Payload
-          rm -rf Payload
+          if [ "$ARCHIVE_SUCCESS" = false ]; then
+            echo "⚠️ Archive directo no disponible sin firma. Compilando binario Release con DerivedData..."
+            xcodebuild clean build \
+              -workspace App.xcworkspace \
+              -scheme App \
+              -configuration Release \
+              -destination 'generic/platform=iOS' \
+              -derivedDataPath build/DerivedData \
+              CODE_SIGNING_ALLOWED=NO \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGN_IDENTITY=""
+          fi
 
-      - name: Upload IPA Artifact
+          mkdir -p build/Payload
+          if [ -d "build/App.xcarchive/Products/Applications/App.app" ]; then
+            cp -r build/App.xcarchive/Products/Applications/App.app build/Payload/
+          elif [ -d "build/DerivedData/Build/Products/Release-iphoneos/App.app" ]; then
+            cp -r build/DerivedData/Build/Products/Release-iphoneos/App.app build/Payload/
+          else
+            echo "❌ Error: No se encontró App.app compilado"
+            find build -name "App.app"
+            exit 1
+          fi
+
+          cd build
+          zip -r -q DaemonX-Music.ipa Payload
+
+      - name: Subir IPA generado como Artifact
         uses: actions/upload-artifact@v4
         with:
           name: DaemonX-Music-iOS-IPA
-          path: DaemonX-Music.ipa
-          retention-days: 30
+          path: ios/App/build/DaemonX-Music.ipa
+          if-no-files-found: error
